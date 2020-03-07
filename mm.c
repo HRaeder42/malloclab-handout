@@ -1,6 +1,6 @@
 /*
  * mm-naive.c - The fastest, least memory-efficient malloc package.
- * 
+ *
  * In this naive approach, a block is allocated by simply incrementing
  * the brk pointer.  A block is pure payload. There are no headers or
  * footers.  Blocks are never coalesced or reused. Realloc is
@@ -24,15 +24,15 @@
  ********************************************************/
 team_t team = {
     /* Team name */
-    "",
+    "Team 32",
     /* First member's full name */
-    "",
+    "Dylan Clausen",
     /* First member's email address */
-    "",
+    "dylanclausen2022@u.northwestern.edu",
     /* Second member's full name (leave blank if none) */
-    "",
+    "Henry Raeder",
     /* Second member's email address (leave blank if none) */
-    ""
+    "henryraeder2020@u.northwestern.edu"
 };
 
 /* single word (4) or double word (8) alignment */
@@ -44,7 +44,7 @@ team_t team = {
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
-/* 
+/*
  * mm_init - initialize the malloc package.
  */
 int mm_init(void)
@@ -52,7 +52,7 @@ int mm_init(void)
     return 0;
 }
 
-/* 
+/*
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
  */
@@ -83,7 +83,7 @@ void *mm_realloc(void *ptr, size_t size)
     void *oldptr = ptr;
     void *newptr;
     size_t copySize;
-    
+
     newptr = mm_malloc(size);
     if (newptr == NULL)
       return NULL;
@@ -94,17 +94,3 @@ void *mm_realloc(void *ptr, size_t size)
     mm_free(oldptr);
     return newptr;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
