@@ -37,6 +37,31 @@ team_t team = {
 
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
+#define WSIZE 4   /* word and header/footer size */
+#define DSIZE 8   /* double word size */
+#define CHUNKSIZE (1 << 12)    /*amount added to heap*/
+
+#define MAX(x, y) ((x) > (y)? (x) : (y))
+
+/* pack a size and bit into a single word */
+#define PACK(size, alloc) ((size) | (alloc))
+
+/* Read and write a word at address p */
+12 #define GET(p) (*(unsigned int *)(p))
+13 #define PUT(p, val) (*(unsigned int *)(p) = (val))
+14
+15 /* Read the size and allocated fields from address p */
+16 #define GET_SIZE(p) (GET(p) & ~0x7)
+17 #define GET_ALLOC(p) (GET(p) & 0x1)
+18
+19 /* Given block ptr bp, compute address of its header and footer */
+20 #define HDRP(bp) ((char *)(bp) - WSIZE)
+21 #define FTRP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
+22
+23 /* Given block ptr bp, compute address of next and previous blocks */
+24 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
+25 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
+
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
@@ -73,6 +98,9 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
+  *(size_t *)p = size;
+  void *oldptr = ptr;
+
 }
 
 /*
