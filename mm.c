@@ -183,10 +183,10 @@ void mm_free(void *bp)
 
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
-    PUT((bp), root);
-    PUT((bp + WSIZE), bp);
-    PUT((root + WSIZE), bp);
-    root = bp;
+    PUT((bp), root);              //put address root points to in "next" spot
+    PUT((bp + WSIZE), bp);        //put bp's address in it's own previous
+    PUT((root + WSIZE), bp);     //put bp's address in root's pointer's previous
+    root = bp;                   //make root point to bp
     coalesce(bp);
 }
 
