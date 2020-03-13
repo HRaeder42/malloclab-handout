@@ -379,7 +379,7 @@ static void *find_fit(size_t asize)
 }
 /* $end mmfirstfit */
 
-static void printblock(void *bp)
+static void printblock(void *bp)  // gives visual representation of block
 {
     size_t hsize, halloc, fsize, falloc;
 
@@ -401,15 +401,15 @@ static void printblock(void *bp)
 
 static void checkblock(void *bp)
 {
-    if ((size_t)bp % 8)
+    if ((size_t)bp % 8)  //checks alignment
         printf("Error: %p is not doubleword aligned\n", bp);
-    if (GET(HDRP(bp)) != GET(FTRP(bp)))
+    if (GET(HDRP(bp)) != GET(FTRP(bp)))  //checks that sizes match both directions
         printf("Error: header does not match footer\n");
-    if (GET_ALLOC(HDRP(bp)) == 0) {
-      if (GET(bp + WSIZE) != bp) {
+    if (GET_ALLOC(HDRP(bp)) == 0) {  //specific to free blocks
+      if (GET_ALLOC(HDRP(GET(bp + WSIZE))) != 0) {  // check previous pointer
         printf("Error: %p did not assign previous properly\n", );
       }
-      if (GET_ALLOC(HDRP(GET(bp))) != 0) {
+      if (GET_ALLOC(HDRP(GET(bp))) != 0) {  // check next pointer
         printf("Error: %p next does not point to a free block\n")
       }
     }
@@ -426,17 +426,17 @@ void checkheap(int verbose)
         printf("Heap (%p):\n", heap_listp);
 
     if ((GET_SIZE(HDRP(heap_listp)) != DSIZE) || !GET_ALLOC(HDRP(heap_listp)))
-        printf("Bad prologue header\n");
+        printf("Bad prologue header\n");  //make sure prologue is aligned and formatted
     checkblock(heap_listp);
 
-    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {    //check every block on the heap
         if (verbose)
-            printblock(bp);
+            printblock(bp);  //allows us to visually look at block
         checkblock(bp);
     }
 
     if (verbose)
         printblock(bp);
     if ((GET_SIZE(HDRP(bp)) != 0) || !(GET_ALLOC(HDRP(bp))))
-        printf("Bad epilogue header\n");
+        printf("Bad epilogue header\n");  //make sure epilogue is aligned and formatted
 }
