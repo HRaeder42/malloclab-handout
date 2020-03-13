@@ -187,10 +187,6 @@ void mm_free(void *bp)
 
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
-    PUT((bp), root);              //put address root points to in "next" spot
-    PUT((bp + WSIZE), bp);        //put bp's address in it's own previous
-    PUT((root + WSIZE), bp);     //put bp's address in root's pointer's previous
-    root = bp;                   //make root point to bp
     coalesce(bp);
 }
 
@@ -208,7 +204,11 @@ static void *coalesce(void *bp)
   size_t size = GET_SIZE(HDRP(bp));
 
   if (prev_alloc && next_alloc) {            /* Case 1 */
-      return bp;                 /* Nothing to coalesce */
+    PUT((bp), root);              //put address root points to in "next" spot
+    PUT((bp + WSIZE), bp);        //put bp's address in it's own previous
+    PUT((root + WSIZE), bp);     //put bp's address in root's pointer's previous
+    root = bp;                   //make root point to bp
+    return bp;                 /* Nothing to coalesce */
   }
 
   else if (prev_alloc && !next_alloc) {      /* Case 2 */
@@ -237,6 +237,14 @@ static void *coalesce(void *bp)
       PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
       PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
       bp = PREV_BLKP(bp);
+
+      PUT(*(PTRP(bp)), *(PTRN(bp)));  //put bp-next in bp-previous-next
+      PUT(*(PTRN(bp + WSIZE)), *(PTRP(bp)));  //put bp-previous in bp-next-previous
+      PUT(*(PTRP(nxt)), *(PTRN(nxt)));  //same as above, but for second block
+      PUT(*(PTRN(nxt + WSIZE)), *(PTRP(nxt)));  //same as above, for second block
+      PUT((root + WSIZE), bp);  //put bp in root-previous
+      PUT((bp), root);  //put root's pointer in bp-next
+      root = bp;  // root points to bp
   }
   /* $end mmfree */
 #ifdef NEXT_FIT
