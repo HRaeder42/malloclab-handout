@@ -369,7 +369,7 @@ static void *find_fit(size_t asize)
     /* First-fit search */
     void *bp;
 
-    for (bp = heap_listp; PTRN(bp) > 0; bp = PTRN(bp)) {
+    for (bp = root; PTRN(bp) > 0; bp = PTRN(bp)) {
         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
             return bp;
         }
@@ -406,10 +406,10 @@ static void checkblock(void *bp)
     if (GET(HDRP(bp)) != GET(FTRP(bp)))  //checks that sizes match both directions
         printf("Error: header does not match footer\n");
     if (GET_ALLOC(HDRP(bp)) == 0) {  //specific to free blocks
-      if (GET_ALLOC(HDRP(GET(bp + WSIZE))) != 0) {  // check previous pointer
+      if (GET_ALLOC(HDRP(GET(bp + WSIZE))) != 0) {  // check previous pointer points to free
         printf("Error: %p did not assign previous properly\n", );
       }
-      if (GET_ALLOC(HDRP(GET(bp))) != 0) {  // check next pointer
+      if (GET_ALLOC(HDRP(GET(bp))) != 0) {  // check next pointer points to free
         printf("Error: %p next does not point to a free block\n")
       }
     }
