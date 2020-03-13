@@ -101,15 +101,19 @@ static void checkblock(void *bp);
 /* $begin mminit */
 int mm_init(void)
 {
-    /* Create the initial empty heap */
-    if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1) //line:vm:mm:begininit
-        return -1;
-    PUT(heap_listp, 0);                          /* Alignment padding */
-    PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1)); /* Prologue header */
-    PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1)); /* Prologue footer */
-    PUT(heap_listp + (3*WSIZE), PACK(0, 1));     /* Epilogue header */
-    heap_listp += (2*WSIZE);                     //line:vm:mm:endinit
-    /* $end mminit */
+  /* Create empty heap */
+  if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1)
+      return -1;
+  PUT(heap_listp, 0);
+  PUT(heap_listp + (1*WSIZE), PACK(ALIGNMENT, 1));
+  PUT(heap_listp + (2*WSIZE), PACK(ALIGNMENT, 1));
+  PUT(heap_listp + (3*WSIZE), PACK(0,1));
+  heap_listp += (2*WSIZE);
+  last_freep = heap_listp;
+
+  // Set pointers in first block allocated
+  PUT(heap_listp, heap_listp);
+  PUT(heap_listp + WSIZE, heap_listp);
 
 #ifdef NEXT_FIT
     rover = root;
@@ -197,43 +201,52 @@ void mm_free(void *bp)
 /* $begin mmfree */
 static void *coalesce(void *bp)
 {
-    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
-    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
-    size_t size = GET_SIZE(HDRP(bp));
+  char *prv = PREV_BLKP(bp);
+  char *nxt = NEXT_BLKP(bp);
+  size_t prev_alloc = GET_ALLOC(FTRP(prv));
+  size_t next_alloc = GET_ALLOC(HDRP(nxt));
+  size_t size = GET_SIZE(HDRP(bp));
 
-    if (prev_alloc && next_alloc) {            /* Case 1 */
-        return bp;
-    }
+  if (prev_alloc && next_alloc) {            /* Case 1 */
+      return bp;                 /* Nothing to coalesce */
+  }
 
-    else if (prev_alloc && !next_alloc) {      /* Case 2 */
-        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
-        PUT(HDRP(bp), PACK(size, 0));
-        PUT(FTRP(bp), PACK(size,0));
-    }
+  else if (prev_alloc && !next_alloc) {      /* Case 2 */
+                                  /* Coalesce forwards */
+      PUT(bp, PTRN(nxt));
+      PUT(bp, PTRP(nxt));
+      PUT(*(PTRN(nxt)+WSIZE), bp);
+      PUT(*(PTRP(nxt)), bp);
+      size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+      PUT(HDRP(bp), PACK(size, 0));
+      PUT(FTRP(bp), PACK(size,0));
+  }
 
-    else if (!prev_alloc && next_alloc) {      /* Case 3 */
-        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
-        PUT(FTRP(bp), PACK(size, 0));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        bp = PREV_BLKP(bp);
-    }
+  else if (!prev_alloc && next_alloc) {      /* Case 3 */
+                                 /* Coalesce backwards */
+      size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+      PUT(FTRP(bp), PACK(size, 0));
+      PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+      bp = PREV_BLKP(bp);
+  }
 
-    else {                                     /* Case 4 */
-        size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
-            GET_SIZE(FTRP(NEXT_BLKP(bp)));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
-        bp = PREV_BLKP(bp);
-    }
-    /* $end mmfree */
+  else {                                     /* Case 4 */
+
+      size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
+          GET_SIZE(FTRP(NEXT_BLKP(bp)));
+      PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+      PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+      bp = PREV_BLKP(bp);
+  }
+  /* $end mmfree */
 #ifdef NEXT_FIT
-    /* Make sure the rover isn't pointing into the free block */
-    /* that we just coalesced */
-    if ((rover > (char *)bp) && (rover < NEXT_BLKP(bp)))
-        rover = bp;
+  /* Make sure the rover isn't pointing into the free block */
+  /* that we just coalesced */
+  if ((rover > (char *)bp) && (rover < NEXT_BLKP(bp)))
+      rover = bp;
 #endif
-    /* $begin mmfree */
-    return bp;
+  /* $begin mmfree */
+  return bp;
 }
 /* $end mmfree */
 
@@ -292,21 +305,25 @@ void mm_checkheap(int verbose)
 /* $begin mmextendheap */
 static void *extend_heap(size_t words)
 {
-    char *bp;
-    size_t size;
+  char *bp;
+  size_t size;
 
-    /* Allocate an even number of words to maintain alignment */
-    size = (words % 2) ? (words+1) * WSIZE : words * WSIZE; //line:vm:mm:beginextend
-    if ((long)(bp = mem_sbrk(size)) == -1)
-        return NULL;                                        //line:vm:mm:endextend
+  /* Allocate an even number of words to maintain alignment */
+  size = (words % 2) ? (words+1) * WSIZE : words * WSIZE; //line:vm:mm:beginextend
+  if ((long)(bp = mem_sbrk(size)) == -1)
+      return NULL;                                        //line:vm:mm:endextend
 
-    /* Initialize free block header/footer and the epilogue header */
-    PUT(HDRP(bp), PACK(size, 0));         /* Free block header */   //line:vm:mm:freeblockhdr
-    PUT(FTRP(bp), PACK(size, 0));         /* Free block footer */   //line:vm:mm:freeblockftr
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* New epilogue header */ //line:vm:mm:newepihdr
+  /* Initialize free block header/footer and the epilogue header */
+  PUT(HDRP(bp), PACK(size, 0));         /* Free block header */   //line:vm:mm:freeblockhdr
+  PUT(FTRP(bp), PACK(size, 0));         /* Free block footer */   //line:vm:mm:freeblockftr
+  PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* New epilogue header */ //line:vm:mm:newepihdr
 
-    /* Coalesce if the previous block was free */
-    return coalesce(bp);                                          //line:vm:mm:returnblock
+  // Set pointers in new block
+  PUT(bp, heap_listp);
+  PUT(bp+WSIZE, last_freep);
+
+  /* Coalesce if the previous block was free */
+  return coalesce(bp);                                           //line:vm:mm:returnblock
 }
 /* $end mmextendheap */
 
