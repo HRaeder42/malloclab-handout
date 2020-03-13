@@ -420,14 +420,18 @@ static void checkblock(void *bp)
 {
     if ((size_t)bp % 8)  //checks alignment
         printf("Error: %p is not doubleword aligned\n", bp);
+        return -1;
     if (GET(HDRP(bp)) != GET(FTRP(bp)))  //checks that sizes match both directions
         printf("Error: header does not match footer\n");
+        return -1;
     if (GET_ALLOC(HDRP(bp)) == 0) {  //specific to free blocks
       if (GET_ALLOC(HDRP(GET(bp + WSIZE))) != 0) {  // check previous pointer points to free
         printf("Error: %p did not assign previous properly\n", );
+        return -1;
       }
       if (GET_ALLOC(HDRP(GET(bp))) != 0) {  // check next pointer points to free
-        printf("Error: %p next does not point to a free block\n")
+        printf("Error: %p next does not point to a free block\n");
+        return -1;
       }
     }
 }
@@ -444,6 +448,7 @@ void checkheap(int verbose)
 
     if ((GET_SIZE(HDRP(heap_listp)) != DSIZE) || !GET_ALLOC(HDRP(heap_listp)))
         printf("Bad prologue header\n");  //make sure prologue is aligned and formatted
+        return -1;
     checkblock(heap_listp);
 
     for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {    //check every block on the heap
@@ -456,4 +461,6 @@ void checkheap(int verbose)
         printblock(bp);
     if ((GET_SIZE(HDRP(bp)) != 0) || !(GET_ALLOC(HDRP(bp))))
         printf("Bad epilogue header\n");  //make sure epilogue is aligned and formatted
+        return -1;
+    return 0
 }
