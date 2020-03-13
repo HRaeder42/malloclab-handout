@@ -405,6 +405,14 @@ static void checkblock(void *bp)
         printf("Error: %p is not doubleword aligned\n", bp);
     if (GET(HDRP(bp)) != GET(FTRP(bp)))
         printf("Error: header does not match footer\n");
+    if (GET_ALLOC(HDRP(bp)) == 0) {
+      if (GET(bp + WSIZE) != bp) {
+        printf("Error: %p did not assign previous properly\n", );
+      }
+      if (GET_ALLOC(HDRP(GET(bp))) != 0) {
+        printf("Error: %p next does not point to a free block\n")
+      }
+    }
 }
 
 /*
