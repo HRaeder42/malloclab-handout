@@ -258,7 +258,7 @@ void *mm_realloc(void *ptr, size_t size)
 
     asize = ALIGN(size);
 
-    oldsize = GET_SIZE(HDRP(oldptr)) - DSIZE; //Subtracts header and footer size
+    oldsize = GET_SIZE(HDRP(ptr)) - DSIZE; //Subtracts header and footer size
 
     if (asize == oldsize) {
         return ptr;
@@ -301,7 +301,7 @@ void *mm_realloc(void *ptr, size_t size)
             else {
                 // Extra space can be used--coalesce the extra
                 PUT(HDRP(ptr), PACK(asize + DSIZE, 1));
-                PUT(FTRP(ptr), PACK(aszie + DSIZE, 1));
+                PUT(FTRP(ptr), PACK(asize + DSIZE, 1));
                 newptr = ptr;
                 ptr = NEXT_BLKP(newptr);
                 PUT(HDRP(ptr), PACK(oldsize + next_size - asize, 0));
@@ -326,11 +326,11 @@ void *mm_realloc(void *ptr, size_t size)
 
 /*
  * mm_checkheap - Check the heap for correctness
- */
-void mm_checkheap(int verbose)
+ *//*
+void mm_checkheap()
 {
-    checkheap();
-}
+    return checkheap();
+}*/
 
 /*
  * The remaining routines are internal helper routines
@@ -370,13 +370,23 @@ static void *place(void *bp, size_t asize)
     remove_free_block(bp);
 
     if ((csize - asize) >= (2*DSIZE)) {
-
-        PUT(HDRP(bp), PACK(asize, 1));
-        PUT(FTRP(bp), PACK(asize, 1));
-        nxt = NEXT_BLKP(bp);
-        PUT(HDRP(bp), PACK(csize-asize, 0));
-        PUT(FTRP(bp), PACK(csize-asize, 0));
-        insert_free_block(nxt);
+        if ((csize - asize) >= 200){
+            PUT(HDRP(bp), PACK(csize - asize, 0));
+            PUT(FTRP(bp), PACK(csize - asize, 0));
+            nxt = NEXT_BLKP(bp);
+            PUT(HDRP(nxt), PACK(asize, 1));
+            PUT(FTRP(nxt), PACK(asize, 1));
+            insert_free_block(bp, csize - asize);
+            return nxt;  
+        }
+        else {
+            PUT(HDRP(bp), PACK(asize, 1));
+            PUT(FTRP(bp), PACK(asize, 1));
+            nxt = NEXT_BLKP(bp);
+            PUT(HDRP(bp), PACK(csize-asize, 0));
+            PUT(FTRP(bp), PACK(csize-asize, 0));
+            insert_free_block(nxt, csize - asize);
+        }
     }
     else {
         PUT(HDRP(bp), PACK(csize, 1));
@@ -391,18 +401,19 @@ static void *place(void *bp, size_t asize)
 static void *find_fit(size_t asize){
     size_t size_check = asize;
     void *curr = seg_listp;
+    int i;
 
-    for (int i = 0; i < NUM_SEG_LISTS; i++) {
-      if ((i == NUM_SEG_LISTS - 1) || ((size <= 1) && (SEG_LIST(seg_listp, i) != NULL))) {
+    for (i = 0; i < NUM_SEG_LISTS; i++) {
+      if ((i == NUM_SEG_LISTS - 1) || ((size_check <= 1) && (SEG_LIST(seg_listp, i) != NULL))) {
         curr = SEG_LIST(seg_listp, i);
         while ((curr != NULL) && asize > GET_SIZE(HDRP(curr))) {
-            curr = GET_PREV_BLK(curr)
+            curr = GET_PREV_BLK(curr);
         }
         if (curr != NULL) {
-          break
+          break;
         }
       }
-      size = size >> 1;
+      size_check = size_check >> 1;
     }
     return curr;
 }
@@ -415,7 +426,7 @@ static void insert_free_block(void *bp, size_t block_size){
     // Find list for this block
     while ((list_ind < (NUM_SEG_LISTS - 1)) && (block_size > 1)) {
         block_size = block_size >> 1;
-        list_number++;
+        list_ind++;
     }
 
     list_ptr = SEG_LIST(seg_listp, list_ind);
@@ -428,7 +439,7 @@ static void insert_free_block(void *bp, size_t block_size){
 
     if (list_ptr) {
         if (ins_loc) {
-            PUT_PTR(GET_PREV(insert_loc), bp);
+            PUT_PTR(GET_PREV(ins_loc), bp);
             PUT_PTR(GET_NEXT(bp), ins_loc);
             PUT_PTR(GET_PREV(bp), list_ptr);
             PUT_PTR(GET_NEXT(list_ptr), bp); 
@@ -461,13 +472,13 @@ static void remove_free_block(void *bp){
     size_t block_size = GET_SIZE(HDRP(bp));
 
     if (GET_NEXT_BLK(bp) == NULL) {
-        while (list_number < (SEG_LIST_COUNT - 1) && block_size > 1) {
+        while (list_num < (NUM_SEG_LISTS - 1) && block_size > 1) {
             block_size = block_size >> 1;
-            list_number++;
+            list_num++;
         }
-        SEG_LIST(seg_listp, list_number) = GET_PREV_BLK(bp);
-        if (SEG_LIST(seg_listp, list_number) != NULL) {
-            PUT_PTR(GET_NEXT(SEG_LIST(seg_listp, list_number)), NULL);
+        SEG_LIST(seg_listp, list_num) = GET_PREV_BLK(bp);
+        if (SEG_LIST(seg_listp, list_num) != NULL) {
+            PUT_PTR(GET_NEXT(SEG_LIST(seg_listp, list_num)), NULL);
         }
         return;
     }
@@ -477,7 +488,7 @@ static void remove_free_block(void *bp){
     if (GET_PREV_BLK(bp) != NULL) {
         PUT_PTR(GET_NEXT(GET_PREV_BLK(bp)), GET_NEXT_BLK(bp));
     } 
-}
+} /*
 
 static void checkblockfree(void *bp)
 {
@@ -528,7 +539,7 @@ static void checkblockall(void *curr, void *next)
 
 /*
  * checkheap - Minimal check of the heap for consistency
- */
+ *//*
 int checkheap(void)
 {
     void *curr = heap_listp;  //points to current block
@@ -557,3 +568,4 @@ int checkheap(void)
         return 0;
     return 1
 }
+*/
