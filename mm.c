@@ -77,7 +77,7 @@ team_t team = {
 
 /* Global variables */
 static char *heap_listp = 0;  /* Pointer to first block */
-static char *seg_listp = 0;        /* Explicit List Root*/
+static char *seg_listp;        /* Explicit List Root*/
 
 /* Segregated list helpers */
 
@@ -122,8 +122,8 @@ int mm_init(void)
     if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1)
         return -1;
     PUT(heap_listp, 0);
-    PUT(heap_listp + (1*WSIZE), PACK(ALIGNMENT, 1));
-    PUT(heap_listp + (2*WSIZE), PACK(ALIGNMENT, 1));
+    PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1));
+    PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));
     PUT(heap_listp + (3*WSIZE), PACK(0,1));
     heap_listp += (2*WSIZE);
 
@@ -383,8 +383,8 @@ static void *place(void *bp, size_t asize)
             PUT(HDRP(bp), PACK(asize, 1));
             PUT(FTRP(bp), PACK(asize, 1));
             nxt = NEXT_BLKP(bp);
-            PUT(HDRP(bp), PACK(csize-asize, 0));
-            PUT(FTRP(bp), PACK(csize-asize, 0));
+            PUT(HDRP(nxt), PACK(csize-asize, 0));
+            PUT(FTRP(nxt), PACK(csize-asize, 0));
             insert_free_block(nxt, csize - asize);
         }
     }
@@ -401,8 +401,25 @@ static void *place(void *bp, size_t asize)
 static void *find_fit(size_t asize){
     size_t size_check = asize;
     void *curr = seg_listp;
-    int i;
+    int i = 0;
 
+    while (i < NUM_SEG_LISTS) {
+	
+        if ((i == NUM_SEG_LISTS - 1) || ((size_check <= 1) && (SEG_LIST(seg_listp, i)!= NULL))) {
+            curr  = SEG_LIST(seg_listp, i);
+
+            // locate the smallest block that can fit
+            while ((curr != NULL) && (asize > GET_SIZE(HDRP(curr)))){
+                curr = GET_PREV_BLK(curr);
+            }
+            if (curr != NULL) {
+                break;
+            }
+        }
+        i++;
+        size_check = size_check >> 1;
+    }
+/*
     for (i = 0; i < NUM_SEG_LISTS; i++) {
       if ((i == NUM_SEG_LISTS - 1) || ((size_check <= 1) && (SEG_LIST(seg_listp, i) != NULL))) {
         curr = SEG_LIST(seg_listp, i);
@@ -415,6 +432,7 @@ static void *find_fit(size_t asize){
       }
       size_check = size_check >> 1;
     }
+    */
     return curr;
 }
 
