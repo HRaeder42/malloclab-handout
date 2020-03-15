@@ -298,9 +298,9 @@ void *mm_realloc(void *ptr, size_t size)
 /*
  * mm_checkheap - Check the heap for correctness
  */
-void mm_checkheap(int verbose)
+int mm_check(void)
 {
-    checkheap(verbose);
+    return checkheap();
 }
 
 /*
@@ -369,7 +369,23 @@ static void place(void *bp, size_t asize)
 static void *find_fit(size_t asize)
 /* $end mmfirstfit-proto */
 {
-    /* $end mmfirstfit */
+    size_t size_check = asize;
+    void *curr = seg_listp;
+
+    for (int i = 0; i < NUM_SEG_LISTS; i++) {
+      if ((i == NUM_SEG_LISTS - 1) || ((size <= 1) && (SEG_LIST(seg_listp, i) != NULL))) {
+        curr = SEG_LIST(seg_listp, i);
+        while ((curr != NULL) && asize > GET_SIZE(HDRP(curr))) {
+            curr = GET_PREV_BLK(curr)
+        }
+        if (curr != NULL) {
+          break
+        }
+      }
+      size = size >> 1;
+    }
+    return curr;
+}
 
 #ifdef NEXT_FIT
     /* Next fit search */
@@ -401,42 +417,49 @@ static void *find_fit(size_t asize)
 }
 /* $end mmfirstfit */
 
-static void printblock(void *bp)  // gives visual representation of block
-{
-    size_t hsize, halloc, fsize, falloc;
-
-    checkheap(0);
-    hsize = GET_SIZE(HDRP(bp));
-    halloc = GET_ALLOC(HDRP(bp));
-    fsize = GET_SIZE(FTRP(bp));
-    falloc = GET_ALLOC(FTRP(bp));
-
-    if (hsize == 0) {
-        printf("%p: EOL\n", bp);
-        return;
-    }
-
-    printf("%p: header: [%ld:%c] footer: [%ld:%c]\n", bp,
-           hsize, (halloc ? 'a' : 'f'),
-           fsize, (falloc ? 'a' : 'f'));
-}
-
-static void checkblock(void *bp)
+static void checkblockfree(void *bp)
 {
     if ((size_t)bp % 8)  //checks alignment
         printf("Error: %p is not doubleword aligned\n", bp);
-        return -1;
+        return 0;
     if (GET(HDRP(bp)) != GET(FTRP(bp)))  //checks that sizes match both directions
         printf("Error: header does not match footer\n");
-        return -1;
+        return 0;
+    if (GET_ALLOC(bp) != 0) {
+      printf("Error: block in free list at %p is not marked free")
+    }
     if (GET_ALLOC(HDRP(bp)) == 0) {  //specific to free blocks
       if (GET_ALLOC(HDRP(GET(bp + WSIZE))) != 0) {  // check previous pointer points to free
         printf("Error: %p did not assign previous properly\n", );
-        return -1;
+        return 0;
       }
       if (GET_ALLOC(HDRP(GET(bp))) != 0) {  // check next pointer points to free
         printf("Error: %p next does not point to a free block\n");
-        return -1;
+        return 0;
+      }
+    }
+}
+
+static void checkblockall(void *curr, void *next)
+{
+    if ((size_t)curr % 8)  //checks alignment
+        printf("Error: %p is not doubleword aligned\n", bp);
+        return 0;
+    if (GET(HDRP(curr)) != GET(FTRP(curr)))  //checks that sizes match both directions
+        printf("Error: header does not match footer\n");
+        return 0;
+    if (GET_ALLOC(HDRP(curr)) == 0) {  //specific to free blocks
+      if (GET_ALLOC(HDRP(GET(bp + WSIZE))) != 0) {  // check previous pointer points to free
+        printf("Error: %p did not assign previous properly\n", );
+        return 0;
+      }
+      if (GET_ALLOC(HDRP(GET(bp))) != 0) {  // check next pointer points to free
+        printf("Error: %p next does not point to a free block\n");
+        return 0;
+      }
+      if(GET_ALLOC(HDRP(next)) == 0) {  //checks that no two free blocks are next to each other
+        printf("Error: two blocks did not coalesce correctly at %p");
+        return 0;
       }
     }
 }
@@ -444,28 +467,31 @@ static void checkblock(void *bp)
 /*
  * checkheap - Minimal check of the heap for consistency
  */
-void checkheap(int verbose)
+int checkheap(void)
 {
-    char *bp = heap_listp;
-
-    if (verbose)
-        printf("Heap (%p):\n", heap_listp);
+    void *curr = heap_listp;  //points to current block
+    void *next = NULL; //points to next block
 
     if ((GET_SIZE(HDRP(heap_listp)) != DSIZE) || !GET_ALLOC(HDRP(heap_listp)))
         printf("Bad prologue header\n");  //make sure prologue is aligned and formatted
-        return -1;
+        return 0;
     checkblock(heap_listp);
 
-    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {    //check every block on the heap
-        if (verbose)
-            printblock(bp);  //allows us to visually look at block
-        checkblock(bp);
+    for (int i = 0; i < NUM_SEG_LISTS; i++) {    //check every block in our free lists
+        curr = SEG_LIST(seg_listp, i);
+        while (curr != NULL) {
+          checkblockfree(curr);
+          curr = GET_PREV_BLK(curr);
+        }
     }
 
-    if (verbose)
-        printblock(bp);
+    for (curr = heap_listp; GET_SIZE(HDRP(curr)) > 0; curr = NEXT_BLKP(curr)) {
+        next = NEXT_BLKP(curr);
+        checkblockall(curr, next);
+    }
+
     if ((GET_SIZE(HDRP(bp)) != 0) || !(GET_ALLOC(HDRP(bp))))
         printf("Bad epilogue header\n");  //make sure epilogue is aligned and formatted
-        return -1;
-    return 0
+        return 0;
+    return 1
 }
