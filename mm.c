@@ -71,8 +71,8 @@ team_t team = {
 #define FTRP(bp)       ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE) //line:vm:mm:ftrp
 
 /*given a free block ptr bp, compute address of its next and previous pointer */
-#define PTRN(bp)       (*bp)
-#define PTRP(bp)       (*(bp + WSIZE))
+#define PTRN(bp)       (*(char **)(bp))
+#define PTRP(bp)       (*(char **)(bp + WSIZE))
 
 /* Given block ptr bp, compute address of next and previous blocks */
 #define NEXT_BLKP(bp)  ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE))) //line:vm:mm:nextblkp
@@ -352,10 +352,7 @@ static void place(void *bp, size_t asize)
         bp = NEXT_BLKP(bp);
         PUT(HDRP(bp), PACK(csize-asize, 0));
         PUT(FTRP(bp), PACK(csize-asize, 0));
-        PUT((bp), root);
-        PUT((bp + WSIZE), bp);
-        PUT((root + WSIZE), bp);
-        root = bp;
+        coalesce(bp);
     }
     else {
         PUT(HDRP(bp), PACK(csize, 1));
